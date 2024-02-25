@@ -1,4 +1,5 @@
 import datetime
+import os
 import time
 
 from telethon import events
@@ -7,6 +8,8 @@ from telethon.sync import TelegramClient
 import logging
 
 from telethon.tl.types import Channel
+
+import convert as fn
 
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s',
                     level=logging.INFO)
@@ -33,9 +36,40 @@ async def ping_handler(event):
 
     message = event.message.message.lower()
     message_id = event.message.from_id
-    media = await event.message.download_media()
+    media = await event.message.download_media("./media/recieved-image.jpg")
 
-    logging.info(f"Received message: {message} from id: {message_id}")
+    if media is not None:
+
+        #to check if file type is jpeg, and convert it to pdf
+        if event.message.file.mime_type.endswith("jpeg"):
+            fn.convert_image_to_pdf(f"{media}", f"./converted-pdf/converted-image.pdf")
+            conv = await event.reply(f"Your converted pdf", file="./converted-pdf/converted-image.pdf")
+            logging.info("File converted to pdf and sent")
+            fn.clear_directory("./converted-pdf")
+
+        #to check if file is pdf, convert pages to images, send and then delete from system
+        elif(event.message.file.mime_type.endswith("pdf")):
+            fn.convert_pdf_to_image(f"{media}", "./testing-images/")
+            directory_path = "./testing-images/"
+            for file_name in os.listdir(directory_path):
+                file_path = os.path.join(directory_path, file_name)
+                await event.reply(file=file_path)
+            fn.clear_directory(directory_path)
+
+
+
+
+# Converting recieved image to pdf if the message has some attachment
+#     if media is not None:
+#         convert.convert_image_to_pdf(f"{media}", f"./converted-pdf/converted-image.pdf")
+#         conv = await event.reply(f"Your converted pdf", file="./converted-pdf/converted-image.pdf")
+#         logging.info("File converted to pdf and sent")
+#         logging.info(conv)
+        #convert.convert_pdf_to_image(f"{media}", "./testing-images/")
+
+
+
+    logging.info(f"Received message: {message} from id: {message_id} with media: {media}")
     file = event.message.file
     logging.info(media)
     reply = "I do not understand this message"
@@ -50,7 +84,7 @@ async def ping_handler(event):
 
     time.sleep(5)
 
-    await bot_responder.delete_messages(event.chat_id, [m.id])
+    await bot_responder.delete_messages(event.chat_id, [m.id, event.message.id])
     logging.info(f"Deleted")
 
     logging.info(f"Message sent: {reply}")
